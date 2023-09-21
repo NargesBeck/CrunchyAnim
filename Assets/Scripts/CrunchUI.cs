@@ -103,7 +103,6 @@ namespace CrunchyAnim
             Vector2 end = new Vector2(endAnchoredXValue, target.anchoredPosition.y);
 
             CrunchyUIMovement crunchyUIMovement = new CrunchyUIMovement(id, target, start, end, duration, framesPerSecond, onComplete, lerpType, repeatType, movementType, speedCurve);
-            crunchyUIMovement.Play();
 
             return id;
         }
@@ -124,7 +123,11 @@ namespace CrunchyAnim
             private CrunchUI.MovementType MovementType;
             private AnimationCurve SpeedCurve;
             public float CrunchedDeltaTime;
-            public float T;
+            public float TimeLapsed;
+
+            private int FramesTotal;
+            private int CountFrames;
+            private float T;
 
             public CrunchyUIMovement() { }
 
@@ -143,31 +146,32 @@ namespace CrunchyAnim
                 MovementType = movementType;
                 SpeedCurve = speedCurve;
 
-                CrunchedDeltaTime = fPS * Time.unscaledDeltaTime / (1f / Time.unscaledDeltaTime);
+                TimeLapsed = 0;
+                CrunchedDeltaTime = 1f / FPS;
+                Instance.AllCurrentCrunchyAnimMovements.Add(this);
+                FramesTotal = (int) duration * fPS;
+                CountFrames = 0;
             }
 
             public void OnUpdate(float deltaT)
             {
-                T += deltaT;
-                if (T >= CrunchedDeltaTime)
+                TimeLapsed += deltaT;
+                if (TimeLapsed >= CrunchedDeltaTime)
                 {
-                    T = 0;
+                    TimeLapsed = 0;
+                    CountFrames++;
+                    T = (float) CountFrames / FramesTotal;
                     switch(MovementType)
                     {
                         case MovementType.MoveX:
 
-                            TargetRectTransform.anchoredPosition = CrunchyMover.MoveX(StartValue, EndValue, LerpType, RepeatType, SpeedCurve, out bool isDone);
-                            if (isDone) { }
+                            TargetRectTransform.anchoredPosition = CrunchyMover.MoveX(StartValue, TargetRectTransform.anchoredPosition, EndValue, 
+                                LerpType, SpeedCurve, T);
+                            if (CountFrames >= FramesTotal) MovementHasCompleted();
                             break;
                     }
                 }
 
-            }
-
-            public void Play()
-            {
-                T = 0;
-                Instance.AllCurrentCrunchyAnimMovements.Add(this);
             }
 
             public void Pause()
@@ -192,8 +196,15 @@ namespace CrunchyAnim
 
             private void MovementHasCompleted()
             {
+                if (MovementType == MovementType.MoveX ||
+                    MovementType == MovementType.MoveY ||
+                    MovementType == MovementType.MoveXY)
+                    TargetRectTransform.anchoredPosition = EndValue;
+
                 if (RepeatType == RepeatType.Once)
                     Kill();
+                
+                OnComplete?.Invoke();
             }
         }
     }
